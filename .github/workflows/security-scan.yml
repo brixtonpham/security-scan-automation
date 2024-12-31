@@ -1,12 +1,11 @@
 name: Security Scan
-
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '0 0 * * *'  # Daily scan
+    - cron: '0 0 * * *'  # Fixed cron syntax
 
 jobs:
   security-scan:
@@ -28,11 +27,18 @@ jobs:
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
           sudo chmod +x /usr/local/bin/yq
 
+      - name: Create .env file
+        run: |
+          echo "SNYK_TOKEN=${{ secrets.SNYK_TOKEN }}" > .env
+          echo "IMAGE_NAME=ubuntu:latest" >> .env
+          echo "SNYK_ENABLED=true" >> .env
+          echo "SNYK_SEVERITY=high" >> .env
+          echo "TRIVY_ENABLED=true" >> .env
+          echo "TRIVY_SEVERITY=HIGH" >> .env
+          echo "TRIVY_IGNORE_UNFIXED=false" >> .env
+          echo "SLACK_WEBHOOK=${{ secrets.SLACK_WEBHOOK }}" >> .env
+
       - name: Run security scan
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          IMAGE_NAME: "ubuntu:latest"
         run: |
           chmod +x security-scan.sh
           ./security-scan.sh
