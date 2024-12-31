@@ -1,0 +1,47 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * *'  # Daily scan
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Run security scan
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          IMAGE_NAME: "ubuntu:latest"
+        run: |
+          chmod +x security-scan.sh
+          ./security-scan.sh
+
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: |
+            reports/report.html
+            reports/high-severity.json
