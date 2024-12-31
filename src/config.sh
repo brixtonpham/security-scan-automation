@@ -1,4 +1,3 @@
-# src/config.sh
 #!/bin/bash
 
 function load_config() {
@@ -9,14 +8,14 @@ function load_config() {
     if [ ! -f "$default_config" ]; then
         echo "[ERROR] Default config not found: $default_config"
         exit 1
-    }
+    fi
 
     cp "$default_config" "$output"
 
     if [ -f "$custom_config" ]; then
         yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$output" "$custom_config" > "${output}.tmp"
         mv "${output}.tmp" "$output"
-    }
+    fi
 
     # Export config values
     export SNYK_ENABLED=$(yq e '.tools.snyk.enabled' "$output")
@@ -27,23 +26,3 @@ function load_config() {
     export SLACK_ENABLED=$(yq e '.notifications.slack.enabled' "$output")
     export SLACK_WEBHOOK=$(yq e '.notifications.slack.webhook' "$output")
 }
-
-# config/default.yaml
-tools:
-  snyk:
-    enabled: true
-    severity: high
-    ignore_dev_dependencies: true
-  trivy:
-    enabled: true
-    severity: critical
-    ignore_unfixed: true
-
-notifications:
-  slack:
-    enabled: false
-    webhook: ${SLACK_WEBHOOK}
-
-report:
-  format: html
-  output_dir: reports
