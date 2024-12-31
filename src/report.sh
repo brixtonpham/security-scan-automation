@@ -5,8 +5,7 @@ function send_notification() {
     
     if [ "$SLACK_ENABLED" = "true" ] && [ -n "$SLACK_WEBHOOK" ]; then
         echo "[INFO] Sending Slack notification..."
-        curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"$message\"}" "$SLACK_WEBHOOK"
+        curl -X POST -H 'Content-type: application/json'             --data "{\"text\":\"$message\"}" "$SLACK_WEBHOOK"
     fi
 }
 
@@ -17,7 +16,6 @@ function generate_report() {
     echo "[INFO] Generating HTML report..."
 
     cat > reports/report.html << 'EOFHTML'
-<!DOCTYPE html>
 <html>
 <head>
     <title>Security Scan Report</title>
