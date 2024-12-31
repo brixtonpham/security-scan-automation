@@ -1,4 +1,3 @@
-# src/report.sh
 #!/bin/bash
 
 function send_notification() {
@@ -17,7 +16,7 @@ function generate_report() {
     
     echo "[INFO] Generating HTML report..."
 
-    cat << EOF > reports/report.html
+    cat > reports/report.html << 'EOFHTML'
 <!DOCTYPE html>
 <html>
 <head>
@@ -56,3 +55,39 @@ function generate_report() {
                 </tr>
             </thead>
             <tbody>
+EOFHTML
+
+    if [ -f "reports/high-severity.json" ]; then
+        while IFS= read -r vuln; do
+            title=$(echo "$vuln" | jq -r '.Title // .title // "N/A"')
+            severity=$(echo "$vuln" | jq -r '.Severity // .severity // "N/A"')
+            package=$(echo "$vuln" | jq -r '.PkgName // .package // "N/A"')
+            version=$(echo "$vuln" | jq -r '.InstalledVersion // .version // "N/A"')
+            fix=$(echo "$vuln" | jq -r '.FixedVersion // .fixedIn[0] // "N/A"')
+
+            cat >> reports/report.html << EOFROW
+                <tr>
+                    <td>$title</td>
+                    <td class="${severity,,}">$severity</td>
+                    <td>$package</td>
+                    <td>$version</td>
+                    <td>$fix</td>
+                </tr>
+EOFROW
+        done < <(jq -c '.[]' reports/high-severity.json)
+    fi
+
+    cat >> reports/report.html << 'EOFHTML'
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+EOFHTML
+
+    if [ "$vuln_count" -gt 0 ]; then
+        send_notification "⚠️ Security Scan found $vuln_count high/critical vulnerabilities!"
+    fi
+
+    echo "[INFO] Report generated: reports/report.html"
+}
