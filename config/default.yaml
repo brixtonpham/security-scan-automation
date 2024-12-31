@@ -1,0 +1,25 @@
+# config/default.yaml
+tools:
+  snyk:
+    enabled: true
+    severity: high
+    ignore_dev_dependencies: true
+  trivy:
+    enabled: true
+    severity: critical
+    ignore_unfixed: true
+
+notifications:
+  slack:
+    enabled: false
+    webhook: ${SLACK_WEBHOOK}
+    channel: security
+  email:
+    enabled: false
+    smtp_server: ${SMTP_SERVER}
+    from: ${EMAIL_FROM}
+    to: ${EMAIL_TO}
+
+report:
+  format: html
+  output_dir: ./reports
