@@ -1,98 +1,88 @@
-# Security Scan Automation
+```markdown
+# Security Pipeline Scanner
 
-Automated security scanning tool that integrates with DevOps pipelines to detect vulnerabilities in dependencies and containers.
+Automated security scanning tool for CI/CD pipelines integrating Snyk and Trivy.
 
 ## Features
-
-- Automated tool installation (Snyk, Trivy)
-- Dependency and container scanning
-- Configurable severity thresholds
+- Automated vulnerability scanning for dependencies and containers
+- Configurable severity thresholds and ignore rules
 - HTML report generation
-- Slack notifications
-- GitHub Actions integration
+- Integration with GitHub Actions
 
-## Requirements
+## Project Structure
+```
+security-scan-automation/
+├── .github/
+│   └── workflows/
+│       └── security-scan.yml    # GitHub Actions workflow
+├── src/
+│   ├── config.sh               # Configuration management
+│   ├── tools.sh                # Tool installation & checks  
+│   ├── scan.sh                 # Security scanning
+│   ├── analyze.sh              # Results analysis
+│   ├── report.sh               # Report generation
+│   └── load_env.sh             # Environment loader
+├── config/
+│   └── default.yaml            # Default configuration
+├── reports/                    # Scan results output
+├── .env                        # Environment variables
+├── .env.example               # Environment template
+├── .gitignore
+├── README.md
+└── security-scan.sh           # Main script
+```
 
-- Linux/WSL environment 
-- Node.js 16+
+## Prerequisites
+- Node.js ≥14
 - Docker
-- jq, curl
+- jq
+- yq
 
 ## Installation
-
 ```bash
 # Clone repository
 git clone https://github.com/brixtonpham/security-scan-automation.git
 cd security-scan-automation
 
 # Install dependencies
-sudo apt-get update && sudo apt-get install -y jq curl
-sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
-sudo chmod +x /usr/local/bin/yq
+npm install -g snyk
 
-# Configure environment variables
-export SNYK_TOKEN="your-snyk-token"
-export SLACK_WEBHOOK="your-slack-webhook-url" 
-export IMAGE_NAME="image-to-scan:tag"
+# Set environment variables
+cp .env.example .env
+# Edit .env with your tokens and settings
 ```
 
 ## Usage
-
 ```bash
+# Make scripts executable
+chmod +x security-scan.sh
+chmod +x src/*.sh
+
+# Run scan
 ./security-scan.sh
 ```
 
-Results will be in the `reports` directory:
-- report.html: Detailed HTML report
-- high-severity.json: JSON list of critical findings
-
 ## Configuration
+Configure scan settings in `.env`:
+```bash
+SNYK_TOKEN=xxx              # Required for Snyk scans
+SNYK_ENABLED=true          
+SNYK_SEVERITY=high
 
-Edit `config/default.yaml` or create `config/custom.yaml` to customize:
+TRIVY_ENABLED=true
+TRIVY_SEVERITY=HIGH
+TRIVY_IGNORE_UNFIXED=false
 
-```yaml
-tools:
-  snyk:
-    enabled: true
-    severity: high
-  trivy:
-    enabled: true
-    severity: critical
-    ignore_unfixed: true
-
-notifications:
-  slack:
-    enabled: false
-    webhook: ${SLACK_WEBHOOK}
+IMAGE_NAME=ubuntu:latest    # Container to scan
 ```
 
-## GitHub Actions
+## GitHub Actions Integration
+The scanner runs automatically on:
+- Push to main branch
+- Pull requests
+- Daily schedule
 
-The project includes GitHub Actions workflow that:
-- Runs on push/PR to main branch
-- Executes daily security scans
-- Uploads scan results as artifacts
-
-Required secrets:
-- SNYK_TOKEN
-- SLACK_WEBHOOK
-
-## Project Structure
-
-```
-security-scan-automation/
-├── src/
-│   ├── tools.sh       # Tool management
-│   ├── scan.sh        # Security scanning
-│   ├── analyze.sh     # Result analysis
-│   └── report.sh      # Report generation
-├── config/
-│   └── default.yaml   # Default configuration
-├── .github/
-│   └── workflows/     # GitHub Actions
-└── reports/           # Scan results
-```
-
-## License
-
-MIT
+## Report Examples
+Reports are generated in `reports/`:
+- `report.html`: Summary and details
+- `high-severity.json`: Critical/high vulnerabilities
