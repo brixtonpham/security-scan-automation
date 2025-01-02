@@ -1,0 +1,16 @@
+{
+  "name": "vuln-demo",
+  "version": "1.0.0",
+  "description": "Demo project with known vulnerabilities for Snyk and Trivy tests",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "lodash": "4.17.15"
+  },
+  "devDependencies": {},
+  "keywords": [],
+  "author": "Example Author",
+  "license": "ISC"
+}
