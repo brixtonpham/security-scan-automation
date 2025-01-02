@@ -1,36 +1,42 @@
 name: Security Scan
+
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
   schedule:
-    - cron: '0 0 * * *'  # Fixed cron syntax
+    - cron: '0 0 * * *'
 
 jobs:
   security-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
+      # Step 1: Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Step 2: Setup Node.js (adjustable for other environments)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '16'
 
-      - name: Install dependencies
+      # Step 3: Install dependencies (jq, yq, curl)
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y jq curl
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
           sudo chmod +x /usr/local/bin/yq
 
+      # Step 4: Create .env file with secrets and configurations
       - name: Create .env file
         run: |
           echo "SNYK_TOKEN=${{ secrets.SNYK_TOKEN }}" > .env
-          echo "IMAGE_NAME=ubuntu:latest" >> .env
           echo "SNYK_ENABLED=true" >> .env
           echo "SNYK_SEVERITY=high" >> .env
           echo "TRIVY_ENABLED=true" >> .env
@@ -38,11 +44,23 @@ jobs:
           echo "TRIVY_IGNORE_UNFIXED=false" >> .env
           echo "SLACK_WEBHOOK=${{ secrets.SLACK_WEBHOOK }}" >> .env
 
+      # Step 5: Conditionally build Docker image if Dockerfile exists
+      - name: Build Docker image (if Dockerfile exists)
+        run: |
+          if [[ -f Dockerfile ]]; then
+            docker build -t project-specific-image:latest .
+            echo "IMAGE_NAME=project-specific-image:latest" >> .env
+          else
+            echo "IMAGE_NAME=ubuntu:latest" >> .env
+          fi
+
+      # Step 6: Run security scan script
       - name: Run security scan
         run: |
           chmod +x security-scan.sh
           ./security-scan.sh
 
+      # Step 7: Upload scan results as artifacts
       - name: Upload scan results
         if: always()
         uses: actions/upload-artifact@v3
