@@ -14,8 +14,6 @@ An **automated security scanning tool** for CI/CD pipelines, integrating **Snyk*
 - [Usage](#usage)
 - [CI/CD Integration](#cicd-integration)
 - [Reports](#reports)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -45,12 +43,7 @@ security-scan-automation/
 ├── config/
 │   └── default.yaml             # Default configuration
 ├── reports/                     # Generated scan results
-├── templates/                   # Report templates
-│   └── report.html              # HTML report template
-├── tests/                       # Test files 
-│   └── unit/                    # Unit tests
 ├── .env                         # Environment variables
-├── .env.example                 # Environment template
 ├── .gitignore
 ├── README.md
 └── security-scan.sh             # Main executable script
@@ -104,8 +97,6 @@ nano .env
 ```bash
 # Security Tokens
 SNYK_TOKEN=xxx                # Required for Snyk scans
-SLACK_WEBHOOK=xxx             # Optional for notifications
-
 # Tool Settings
 SNYK_ENABLED=true
 SNYK_SEVERITY=high
@@ -222,35 +213,6 @@ The **HTML report** includes:
 3. **Detailed Findings**
 4. **Remediation Recommendations**
 5. **Scan Metadata**
-
----
-
-## **Contributing**
-1. **Fork** the repository.
-2. Create a **feature branch**:
-   ```bash
-   git checkout -b feature/name
-   ```
-3. Commit changes:
-   ```bash
-   git commit -am "Add feature"
-   ```
-4. Push the branch:
-   ```bash
-   git push origin feature/name
-   ```
-5. Create a **Pull Request**.
-
----
-
-## **License**
-This project is licensed under the **MIT License**. See the `LICENSE` file for details.
-
----
-
-## **Authors**
-- **Phạm Thành Nam** (*@brixtonpham*)
-
 ---
 
 ## **Acknowledgments**
