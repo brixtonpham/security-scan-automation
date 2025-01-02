@@ -22,6 +22,9 @@ export TRIVY_SEVERITY="${TRIVY_SEVERITY:-HIGH}"
 export TRIVY_IGNORE_UNFIXED="${TRIVY_IGNORE_UNFIXED:-false}"
 
 # Initialize
+LOG_FILE="reports/security-scan.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 echo "[INFO] Starting security scan automation..."
 mkdir -p reports
 
@@ -40,21 +43,28 @@ for dir in */; do
     run_security_scans "$dir" "$normalized_dir"
     echo "[INFO] Finished scanning $dir"
 done
-# Analyze results and capture vulnerability count
-vuln_count=$(count_vulnerabilities_from_logs)
 
-# Print the total for debugging or user information (if necessary)
+# Analyze results and generate logs
+analyze_results
+
+# Combine and print all vulnerabilities from logs
+snyk_log="reports/snyk-high-critical-vulnerabilities.log"
+trivy_log="reports/trivy-high-critical-vulnerabilities.log"
+echo "[INFO] High/Critical Vulnerabilities Found:" | tee -a "$LOG_FILE"
+if [ -s "$snyk_log" ]; then
+    cat "$snyk_log" | tee -a "$LOG_FILE"
+fi
+if [ -s "$trivy_log" ]; then
+    cat "$trivy_log" | tee -a "$LOG_FILE"
+fi
+
+# Count vulnerabilities from logs
+vuln_count=$( (cat "$snyk_log" "$trivy_log" | wc -l) 2>/dev/null || echo 0)
+
 echo "[INFO] Total High/Critical Vulnerabilities: $vuln_count"
 
 # Generate the report
 generate_report "$vuln_count"
-
-
-# Validate that vuln_count is a number
-if ! [[ "$vuln_count" =~ ^[0-9]+$ ]]; then
-    echo "[ERROR] analyze_results returned invalid output: $vuln_count" >&2
-    exit 1
-fi
 
 # Check vulnerability count
 if [[ $vuln_count -gt 0 ]]; then
