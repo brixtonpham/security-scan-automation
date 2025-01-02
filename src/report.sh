@@ -5,7 +5,8 @@ function send_notification() {
     
     if [ "$SLACK_ENABLED" = "true" ] && [ -n "$SLACK_WEBHOOK" ]; then
         echo "[INFO] Sending Slack notification..."
-        curl -X POST -H 'Content-type: application/json'             --data "{\"text\":\"$message\"}" "$SLACK_WEBHOOK"
+        curl -X POST -H 'Content-type: application/json' \
+             --data "{\"text\":\"$message\"}" "$SLACK_WEBHOOK"
     fi
 }
 
@@ -15,7 +16,8 @@ function generate_report() {
     
     echo "[INFO] Generating HTML report..."
 
-    cat > reports/report.html << 'EOFHTML'
+    # Tạo header của báo cáo HTML
+    cat > reports/report.html << EOFHTML
 <html>
 <head>
     <title>Security Scan Report</title>
@@ -36,8 +38,8 @@ function generate_report() {
         
         <div class="summary">
             <h2>Summary</h2>
-            <p>Scan Time: $start_time</p>
-            <p>Total High/Critical Vulnerabilities: <span class="high">$vuln_count</span></p>
+            <p>Scan Time: ${start_time}</p>
+            <p>Total High/Critical Vulnerabilities: <span class="high">${vuln_count}</span></p>
             <p>Scanned Image: ${IMAGE_NAME:-N/A}</p>
         </div>
 
@@ -55,7 +57,17 @@ function generate_report() {
             <tbody>
 EOFHTML
 
-    if [ -f "reports/high-severity.json" ]; then
+    # Kiểm tra file high-severity.json
+    if [ ! -f "reports/high-severity.json" ] || [ ! -s "reports/high-severity.json" ]; then
+        # Nếu file không tồn tại hoặc rỗng, thêm dòng thông báo vào báo cáo
+        echo "[INFO] No vulnerabilities found or high-severity.json is empty"
+        cat >> reports/report.html << 'EOFROW'
+                <tr>
+                    <td colspan="5" style="text-align:center; color:green;">No vulnerabilities found</td>
+                </tr>
+EOFROW
+    else
+        # Nếu file tồn tại và không rỗng, thêm các dòng chi tiết lỗ hổng
         while IFS= read -r vuln; do
             title=$(echo "$vuln" | jq -r '.Title // .title // "N/A"')
             severity=$(echo "$vuln" | jq -r '.Severity // .severity // "N/A"')
@@ -65,16 +77,17 @@ EOFHTML
 
             cat >> reports/report.html << EOFROW
                 <tr>
-                    <td>$title</td>
-                    <td class="${severity,,}">$severity</td>
-                    <td>$package</td>
-                    <td>$version</td>
-                    <td>$fix</td>
+                    <td>${title}</td>
+                    <td class="${severity,,}">${severity}</td>
+                    <td>${package}</td>
+                    <td>${version}</td>
+                    <td>${fix}</td>
                 </tr>
 EOFROW
         done < <(jq -c '.[]' reports/high-severity.json)
     fi
 
+    # Kết thúc file HTML
     cat >> reports/report.html << 'EOFHTML'
             </tbody>
         </table>
@@ -83,8 +96,11 @@ EOFROW
 </html>
 EOFHTML
 
+    # Gửi thông báo nếu có lỗ hổng
     if [ "$vuln_count" -gt 0 ]; then
         send_notification "⚠️ Security Scan found $vuln_count high/critical vulnerabilities!"
+    else
+        send_notification "✅ No high/critical vulnerabilities found during the security scan!"
     fi
 
     echo "[INFO] Report generated: reports/report.html"
