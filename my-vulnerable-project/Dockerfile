@@ -15,5 +15,5 @@ RUN apt-get update && apt-get install -y nodejs npm     && npm install
 # Copy code
 COPY . /usr/src/app
 
-# Chạy app (demo)
+# Chạy app (demo) a
 CMD ["node", "index.js"]
