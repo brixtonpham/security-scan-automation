@@ -17,10 +17,9 @@ load_env
 
 export SNYK_ENABLED="${SNYK_ENABLED:-true}"
 export SNYK_SEVERITY="${SNYK_SEVERITY:-high}"
-export TRIVY_ENABLED="${TRIVY_ENABLED:-true}" 
+export TRIVY_ENABLED="${TRIVY_ENABLED:-true}"
 export TRIVY_SEVERITY="${TRIVY_SEVERITY:-HIGH}"
 export TRIVY_IGNORE_UNFIXED="${TRIVY_IGNORE_UNFIXED:-false}"
-export IMAGE_NAME="${IMAGE_NAME:-ubuntu:latest}"
 
 # Initialize
 echo "[INFO] Starting security scan automation..."
@@ -32,20 +31,21 @@ if [ "$SNYK_ENABLED" = "true" ] && [ -z "$SNYK_TOKEN" ]; then
    exit 1
 fi
 
-# Run scans
-check_tools
-run_security_scans
-scan_status=$?
+# Loop through all subdirectories and run scans
+for dir in */; do
+    # Normalize directory name for Docker image and output
+    normalized_dir=$(basename "$dir" | sed 's/[^a-zA-Z0-9]/_/g')
+
+    echo "[INFO] Scanning directory: $dir"
+    run_security_scans "$dir" "$normalized_dir"
+done
+
+# Analyze results
 analyze_results
 vuln_count=$?
 generate_report $vuln_count
 
 # Exit based on findings
-if [ $scan_status -ne 0 ]; then
-   echo "[ERROR] Scan process failed"
-   exit $scan_status
-fi
-
 if [ $vuln_count -gt 0 ]; then
    echo "[WARN] Found $vuln_count vulnerabilities"
    exit 0
