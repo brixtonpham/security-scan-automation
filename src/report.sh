@@ -1,22 +1,44 @@
 #!/bin/bash
 
-function send_notification() {
-    local message="$1"
-
-    if [ "$SLACK_ENABLED" = "true" ] && [ -n "$SLACK_WEBHOOK" ]; then
-        echo "[INFO] Sending Slack notification..."
-        curl -X POST -H 'Content-type: application/json' \
-             --data "{\"text\":\"$message\"}" "$SLACK_WEBHOOK"
+function create_reports_directory() {
+    if [ ! -d "reports" ]; then
+        echo "[INFO] Creating reports directory..."
+        mkdir -p reports
     fi
 }
+
+function count_vulnerabilities_from_logs() {
+    local trivy_file="reports/trivy-high-critical-vulnerabilities.log"
+    local snyk_file="reports/snyk-high-critical-vulnerabilities.log"
+
+    # Check if files exist and are not empty
+    local trivy_count=0
+    local snyk_count=0
+
+    if [ -f "$trivy_file" ]; then
+        trivy_count=$(wc -l < "$trivy_file")
+    fi
+
+    if [ -f "$snyk_file" ]; then
+        snyk_count=$(wc -l < "$snyk_file")
+    fi
+
+    # Calculate total count
+    local total_count=$((trivy_count + snyk_count))
+
+    # Return the count (do not echo here for silent execution)
+    echo "$total_count"
+}
+
 
 function generate_report() {
     local vuln_count=$1
     local start_time=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-    echo "[INFO] Generating consolidated HTML report..."
+    create_reports_directory
 
-    # Tạo file HTML
+    echo "[INFO] Generating consolidated HTML report with $vuln_count vulnerabilities..."
+
     cat > reports/report.html << EOFHTML
 <html>
 <head>
@@ -33,9 +55,6 @@ function generate_report() {
         th { background-color: #f2f2f2; }
         .critical { color: red; font-weight: bold; }
         .high { color: #dc3545; font-weight: bold; }
-        .medium { color: #ff8800; }
-        .low { color: #28a745; }
-        .info { color: #17a2b8; }
     </style>
 </head>
 <body>
@@ -47,16 +66,8 @@ function generate_report() {
             <p><strong>Total High/Critical Vulnerabilities:</strong> <span class="critical">${vuln_count}</span></p>
         </div>
         <div class="details">
-            <h2>Vulnerability Distribution</h2>
-            <p>Below is the detailed distribution of vulnerabilities found during the scan:</p>
-EOFHTML
-
-    # Duyệt qua các file Snyk và Trivy JSON
-    for json_file in reports/snyk-results-*.json reports/trivy-results-*.json; do
-        if [ -s "$json_file" ]; then
-            report_name=$(basename "$json_file" | sed 's/\.[^.]*$//')
-            cat >> reports/report.html << EOFTABLE
-            <h3>Results from: ${report_name}</h3>
+            <h2>Vulnerability Details</h2>
+            <h3>Trivy Results</h3>
             <table>
                 <thead>
                     <tr>
@@ -68,63 +79,77 @@ EOFHTML
                     </tr>
                 </thead>
                 <tbody>
-EOFTABLE
+EOFHTML
 
-            if grep -q '"Results"' "$json_file"; then
-                jq -c '.Results[] | select(.Vulnerabilities != null) | .Vulnerabilities[]' "$json_file" | while read -r vuln; do
-                    title=$(echo "$vuln" | jq -r '.Title // "N/A"')
-                    severity=$(echo "$vuln" | jq -r '.Severity // "N/A"')
-                    package=$(echo "$vuln" | jq -r '.PkgName // "N/A"')
-                    installed=$(echo "$vuln" | jq -r '.InstalledVersion // "N/A"')
-                    fixed=$(echo "$vuln" | jq -r '.FixedVersion // "N/A"')
-
-                    cat >> reports/report.html << EOFROW
-                    <tr>
-                        <td>${title}</td>
-                        <td class="${severity,,}">${severity}</td>
-                        <td>${package}</td>
-                        <td>${installed}</td>
-                        <td>${fixed}</td>
-                    </tr>
+    # Process Trivy log for detailed table
+    local trivy_file="reports/trivy-high-critical-vulnerabilities.log"
+    if [ -f "$trivy_file" ] && [ -s "$trivy_file" ]; then
+        while IFS='|' read -r title severity package installed fix; do
+            cat >> reports/report.html << EOFROW
+                <tr>
+                    <td>${title}</td>
+                    <td class="high">${severity}</td>
+                    <td>${package}</td>
+                    <td>${installed}</td>
+                    <td>${fix}</td>
+                </tr>
 EOFROW
-                done
-            else
-                jq -c '.vulnerabilities[]' "$json_file" | while read -r vuln; do
-                    title=$(echo "$vuln" | jq -r '.title // "N/A"')
-                    severity=$(echo "$vuln" | jq -r '.severity // "N/A"')
-                    package=$(echo "$vuln" | jq -r '.package // "N/A"')
-                    version=$(echo "$vuln" | jq -r '.version // "N/A"')
-                    fix=$(echo "$vuln" | jq -r '.fixedIn[0] // "N/A"')
+        done < "$trivy_file"
+    else
+        cat >> reports/report.html << EOFEMPTY
+                <tr><td colspan="5">No vulnerabilities found in Trivy results.</td></tr>
+EOFEMPTY
+    fi
 
-                    cat >> reports/report.html << EOFROW
-                    <tr>
-                        <td>${title}</td>
-                        <td class="${severity,,}">${severity}</td>
-                        <td>${package}</td>
-                        <td>${version}</td>
-                        <td>${fix}</td>
-                    </tr>
-EOFROW
-                done
-            fi
-
-            cat >> reports/report.html << EOFEND
+    cat >> reports/report.html << EOFTABLEEND
                 </tbody>
             </table>
-EOFEND
-        else
-            echo "[WARN] Skipping empty or missing JSON file: ${json_file}" >> reports/log.txt
-        fi
-    done
+            <h3>Snyk Results</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Severity</th>
+                        <th>Package</th>
+                        <th>Installed Version</th>
+                        <th>Fix Version</th>
+                    </tr>
+                </thead>
+                <tbody>
+EOFTABLEEND
 
-    cat >> reports/report.html << EOFHTML
+    # Process Snyk log for detailed table
+    local snyk_file="reports/snyk-high-critical-vulnerabilities.log"
+    if [ -f "$snyk_file" ] && [ -s "$snyk_file" ]; then
+        while IFS='|' read -r title severity package installed fix; do
+            cat >> reports/report.html << EOFROW
+                <tr>
+                    <td>${title}</td>
+                    <td class="high">${severity}</td>
+                    <td>${package}</td>
+                    <td>${installed}</td>
+                    <td>${fix}</td>
+                </tr>
+EOFROW
+        done < "$snyk_file"
+    else
+        cat >> reports/report.html << EOFEMPTY
+                <tr><td colspan="5">No vulnerabilities found in Snyk results.</td></tr>
+EOFEMPTY
+    fi
+
+    cat >> reports/report.html << EOFEND
+                </tbody>
+            </table>
         </div>
     </div>
 </body>
 </html>
-EOFHTML
+EOFEND
 
     echo "[INFO] Report generated: reports/report.html"
 }
 
-
+# # Main execution flow
+# vuln_count=$(count_vulnerabilities_from_logs)
+# generate_report "$vuln_count"
